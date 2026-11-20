@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<schema
+    xmlns="http://www.concrete5.org/doctrine-xml/0.5"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.concrete5.org/doctrine-xml/0.5 https://concretecms.github.io/doctrine-xml/doctrine-xml-0.5.xsd">
+    <!-- Requests per client and time window, for the public chat (see RateLimiter). Only salted hashes, no IP addresses. -->
+    <table name="OllamaChatRateLimits">
+        <field name="clientHash" type="string" size="64">
+            <key/>
+        </field>
+        <field name="windowStart" type="integer">
+            <unsigned/>
+            <notnull/>
+        </field>
+        <field name="requests" type="integer">
+            <unsigned/>
+            <notnull/>
+        </field>
+    </table>
+</schema>

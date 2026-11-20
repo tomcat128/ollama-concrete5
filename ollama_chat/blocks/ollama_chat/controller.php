@@ -41,6 +41,11 @@ class Controller extends BlockController
         $this->set('contextSize', BlockSettings::DEFAULT_CONTEXT_SIZE);
     }
 
+    public function registerViewAssets($outputContent = '')
+    {
+        $this->requireAsset('ollama_chat/chat');
+    }
+
     public function view()
     {
         $app = Application::getFacadeApplication();

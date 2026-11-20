@@ -6,3 +6,6 @@
 .vscode/
 *.iml
 .DS_Store
+
+# Private plugins of the holiday apartment site; read for development only, never committed
+fewo_toolkit/

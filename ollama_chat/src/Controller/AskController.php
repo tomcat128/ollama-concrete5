@@ -7,6 +7,7 @@ use Concrete\Core\Http\Request;
 use Concrete\Core\Support\Facade\Application;
 use OllamaChat\AccessChecker;
 use OllamaChat\BlockSettings;
+use OllamaChat\ChatRequest;
 use OllamaChat\ChatService;
 use OllamaChat\OllamaException;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,12 +20,6 @@ defined('C5_EXECUTE') or die('Access Denied.');
  */
 class AskController extends AbstractController
 {
-    private const MAX_QUESTION_LENGTH = 4000;
-
-    private const MAX_HISTORY_MESSAGES = 200;
-
-    private const MAX_MESSAGE_LENGTH = 20000;
-
     public function ask(): JsonResponse
     {
         $app = Application::getFacadeApplication();
@@ -44,10 +39,10 @@ class AskController extends AbstractController
         }
 
         $question = trim((string) ($data['question'] ?? ''));
-        if ($question === '' || mb_strlen($question) > self::MAX_QUESTION_LENGTH) {
-            return $this->error(400, t('Bitte eine Frage mit höchstens %s Zeichen eingeben.', self::MAX_QUESTION_LENGTH));
+        if (!ChatRequest::isValidQuestion($question)) {
+            return $this->error(400, t('Bitte eine Frage mit höchstens %s Zeichen eingeben.', ChatRequest::MAX_QUESTION_LENGTH));
         }
-        $history = $this->validHistory($data['history'] ?? []);
+        $history = ChatRequest::history($data['history'] ?? []);
         if ($history === null) {
             return $this->error(400, t('Der mitgeschickte Verlauf ist ungültig.'));
         }
@@ -61,33 +56,6 @@ class AskController extends AbstractController
         }
 
         return new JsonResponse(['answer' => $result['content'], 'model' => $settings->model]);
-    }
-
-    /**
-     * The history as sent by the browser, or null if it is malformed. Only questions and answers are accepted,
-     * so the browser cannot smuggle in its own system prompt.
-     *
-     * @param mixed $history
-     *
-     * @return array<int, array{role: string, content: string}>|null
-     */
-    private function validHistory($history): ?array
-    {
-        if (!is_array($history) || count($history) > self::MAX_HISTORY_MESSAGES) {
-            return null;
-        }
-        $result = [];
-        foreach ($history as $message) {
-            if (!is_array($message)
-                || !in_array($message['role'] ?? null, ['user', 'assistant'], true)
-                || !is_string($message['content'] ?? null)
-                || mb_strlen($message['content']) > self::MAX_MESSAGE_LENGTH) {
-                return null;
-            }
-            $result[] = ['role' => $message['role'], 'content' => $message['content']];
-        }
-
-        return $result;
     }
 
     private function error(int $status, string $message): JsonResponse

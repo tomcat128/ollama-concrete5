@@ -1,6 +1,10 @@
 /*
- * Chat for the "Ollama Chat" block. The conversation exists only in this page: the history is kept in a
- * variable and sent along with every question. Reloading or leaving the page starts a new memory.
+ * Chat shared by the blocks of the Ollama Chat package. Each element with the class "ollama-chat" is one chat;
+ * it posts to the URL in data-ask-url, with the block ID (data-bid) and, if present, a CSRF token (data-token).
+ *
+ * The conversation exists only in this page: the history is kept in a variable and sent along with every
+ * question, together with the "context" the server may return (e.g. the dates understood from the last
+ * question). Reloading or leaving the page starts a new memory.
  */
 (function () {
     'use strict';
@@ -94,6 +98,7 @@
         var resetBtn = root.querySelector('.ollama-chat__reset');
         var emptyHtml = messagesEl.innerHTML;
         var history = [];
+        var context = null;
         var busy = false;
 
         function scrollToBottom() {
@@ -144,17 +149,18 @@
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({
-                    token: root.dataset.token,
+                    token: root.dataset.token || undefined,
                     bID: Number(root.dataset.bid),
                     question: question,
-                    history: history
+                    history: history,
+                    context: context || undefined
                 })
             }).then(function (res) {
                 return res.json().catch(function () {
                     return { error: 'Unerwartete Antwort vom Server (HTTP ' + res.status + ').' };
                 }).then(function (data) {
-                    if (!res.ok || data.error) {
-                        throw new Error(data.error || ('HTTP ' + res.status));
+                    if (!res.ok || data.error || typeof data.answer !== 'string') {
+                        throw new Error(data.error || ('Unerwartete Antwort vom Server (HTTP ' + res.status + ').'));
                     }
                     return data;
                 });
@@ -163,6 +169,9 @@
                 addMessage('assistant', data.answer);
                 // Only complete question/answer pairs are remembered, and only in this page.
                 history.push({ role: 'user', content: question }, { role: 'assistant', content: data.answer });
+                if (data.context !== undefined) {
+                    context = data.context;
+                }
             }).catch(function (error) {
                 stopThinking();
                 addMessage('error', error.message || String(error));
@@ -194,6 +203,7 @@
                 return;
             }
             history = [];
+            context = null;
             messagesEl.innerHTML = emptyHtml;
             input.focus();
         });

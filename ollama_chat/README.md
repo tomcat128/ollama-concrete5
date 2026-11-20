@@ -1,10 +1,14 @@
 # Ollama Chat für Concrete CMS
 
-Paket für Concrete CMS 9.5, das einen Block **„Ollama Chat“** bereitstellt. Über ein Eingabefeld stellt man Fragen zur eigenen Concrete-Installation, etwa „Welche Pakete sind installiert?“ oder „Wann wurde die Seite Kontakt zuletzt geändert und von wem?“. Die Antworten kommen von einem lokalen Sprachmodell über [Ollama](https://ollama.com). Grundlage sind die Daten, die das Paket bei jeder Frage aus der Datenbank der Installation liest.
+Paket für Concrete CMS 9.5 mit zwei Blöcken, die Fragen über ein Eingabefeld mit Hilfe eines lokalen Sprachmodells über [Ollama](https://ollama.com) beantworten:
+
+| Block | Für wen | Beantwortet |
+| --- | --- | --- |
+| **Ollama Chat** | Angemeldete Benutzer mit Dashboard-Zugang | Fragen zur Concrete-Installation, etwa „Welche Pakete sind installiert?“ oder „Wann wurde die Seite Kontakt zuletzt geändert und von wem?“. Grundlage sind Daten, die das Paket bei jeder Frage aus der Datenbank liest. |
+| **Ferienwohnung: Verfügbarkeit & Preis** | Alle Besucher | Fragen von Gästen wie „Ist vom 3. bis 10. August zu zweit frei, und was kostet das?“. Grundlage sind Belegungsplan und Preisliste des Pakets **Fewo Toolkit**; siehe [Ferienwohnung: Verfügbarkeit & Preis](#ferienwohnung-verfügbarkeit--preis). |
 
 - Für Concrete 9.5 (entwickelt für 9.5.7, getestet mit 9.5.4), PHP 7.3 oder neuer
-- Kein festes Gedächtnis: Das Gespräch existiert nur, solange die Seite offen ist
-- Nur für angemeldete Benutzer mit Zugang zum Dashboard
+- Kein festes Gedächtnis: Ein Gespräch existiert nur, solange die Seite offen ist
 
 ## Inhalt
 
@@ -15,6 +19,7 @@ Paket für Concrete CMS 9.5, das einen Block **„Ollama Chat“** bereitstellt.
 - [Gedächtnis](#gedächtnis)
 - [Beispielfragen](#beispielfragen)
 - [Grenzen](#grenzen)
+- [Ferienwohnung: Verfügbarkeit & Preis](#ferienwohnung-verfügbarkeit--preis)
 - [Aufbau](#aufbau)
 - [Fehlersuche](#fehlersuche)
 - [Deinstallation](#deinstallation)
@@ -139,7 +144,7 @@ Die Seite neu laden, eine Frage eingeben, etwa „Welche Pakete sind installiert
 ### Aktualisieren
 
 1. Den Ordner `packages/ollama_chat` durch die neue Version ersetzen.
-2. Hat sich die Version des Pakets geändert, im Dashboard **Extend Concrete → Update Add-Ons** (`/dashboard/extend/update`) auf **Update** klicken, oder:
+2. Hat sich die Version des Pakets geändert (zuletzt von 1.0.0 auf 1.1.0 mit dem Block „Ferienwohnung: Verfügbarkeit & Preis“), im Dashboard **Extend Concrete → Update Add-Ons** (`/dashboard/extend/update`) auf **Update** klicken, oder:
 
    ```bash
    sudo -u www-data concrete/bin/concrete c5:package:update ollama_chat
@@ -205,29 +210,124 @@ Beim Neuladen der Seite, beim Verlassen der Seite und mit **Neues Gespräch** is
 - **Modell:** Kleine Modelle wie `llama3` übersehen gelegentlich etwas oder rechnen falsch, besonders bei Fragen, die mehrere Listen verbinden. Größere Modelle antworten zuverlässiger.
 - **Geschwindigkeit:** Ohne Grafikkarte dauert eine Antwort einige Sekunden bis Minuten. Die erste Frage ist am langsamsten, weil Ollama das Modell lädt.
 
+## Ferienwohnung: Verfügbarkeit & Preis
+
+Ein öffentlicher Block für die Website einer Ferienwohnung. Gäste fragen in eigenen Worten nach freien Terminen und Preisen; die Antworten beruhen auf dem Belegungsplan und der Preisliste des Pakets **Fewo Toolkit**.
+
+### Voraussetzungen
+
+- Das Paket **Fewo Toolkit** (`fewo_toolkit`) ist installiert.
+- Auf einer veröffentlichten Seite steht ein Block **„Belegungsplan (Homeaway)“** mit der Adresse des iCal-Feeds.
+- Es gibt eine Preisliste im Dashboard des Fewo Toolkits; am besten steht auch ein Block **„Preisrechner“** auf einer Seite.
+
+Pro Concrete-Installation gibt es eine Ferienwohnung. Der Block findet Belegungsplan und Preisliste deshalb selbst; im Bearbeitungsformular zeigt er an, was er gefunden hat:
+
+| Daten | Woher |
+| --- | --- |
+| Belegung | iCal-Feed aus dem Block „Belegungsplan (Homeaway)“ |
+| Preisliste und Berechnungsmodus | Aus dem Block „Preisrechner“ (Preisliste und ob die Saison des Anreise- oder des Folgetags zählt). Ohne Preisrechner: die Preisliste eines Blocks „Preisübersicht“ oder die einzige vorhandene Preisliste, mit dem Modus „Folgetag“. |
+
+### Einrichten
+
+1. Paket aktualisieren bzw. installieren, wie unter [Installation](#installation) beschrieben.
+2. Eine Seite anlegen, etwa „Anfrage“, oder eine bestehende nehmen, etwa die Seite mit dem Belegungsplan.
+3. Im Bearbeitungsmodus den Block **Ferienwohnung: Verfügbarkeit & Preis** (Kategorie **Other**) einfügen und die Einstellungen prüfen.
+4. Veröffentlichen.
+
+| Einstellung | Standard | Bedeutung |
+| --- | --- | --- |
+| Überschrift | leer | Wird über dem Chat angezeigt |
+| Seite für Anfragen | keine | Unter dem Chat erscheint ein Link „Jetzt anfragen“ dorthin, etwa zum Kontaktformular |
+| Höchstalter des Belegungsplans | 24 Stunden | Konnte der Feed länger nicht aktualisiert werden, nennt der Assistent keine freien Termine, sondern bittet um eine direkte Anfrage |
+| URL des Ollama-Servers, Modell, Kontextfenster | wie beim Block „Ollama Chat“ | Siehe [Block einfügen](#5-block-einfügen) |
+
+### So entsteht eine Antwort
+
+1. **Das Modell versteht die Frage**: Es bestimmt, ob der Gast nach einem bestimmten Aufenthalt, nach freien Zeiträumen oder allgemein nach Preisen fragt, und liest Anreise, Abreise, Anzahl der Gäste und die Sprache heraus. Mehr macht das Modell nicht.
+2. **Verfügbarkeit**: Das Paket prüft den Zeitraum im iCal-Feed. Es liest den Feed wie der Block „Belegungsplan (Homeaway)“: Jeder Termin ist eine Belegung vom Anreisetag bis zum Abreisetag; der Abreisetag ist ab nachmittags frei, eine neue Anreise an diesem Tag ist möglich. Termine mit dem Titel „Auf Anfrage“ gelten als „nur auf Anfrage“. Der Feed wird in derselben Datei zwischengespeichert, die auch der Belegungsplan-Block nutzt, und nach dessen Aktualisierungsintervall neu geladen.
+3. **Preis**: Den Preis berechnet die Methode `Preisuebersicht::calculate()` des Fewo Toolkits, dieselbe, die der Preisrechner auf der Website verwendet. Der Chat nennt also immer denselben Preis wie der Preisrechner.
+4. **Antwort**: Das Paket setzt die Antwort aus festen Texten auf Deutsch oder Englisch zusammen, mit den berechneten Daten und Beträgen.
+
+Warum formuliert das Modell die Antwort nicht selbst? In Tests hat `llama3` sich dabei nicht an die berechneten Werte gehalten: Es rechnete Preise selbst nach und lag falsch, nannte belegte Zeiträume „frei“ und übersah den Mindestaufenthalt. Bei Terminen und Preisen für Gäste muss jede Angabe stimmen, deshalb hat das Modell hier nur die Aufgabe, die Frage zu verstehen. Die Antwort nennt die verstandenen Daten ausdrücklich, sodass Gäste ein Missverständnis sofort bemerken.
+
+### Was Gäste fragen können
+
+| Frage | Antwort |
+| --- | --- |
+| „Ist vom 3. bis 10. August zu zweit frei, und was kostet das?“ | Frei, belegt oder nur auf Anfrage; bei belegt freie Zeiträume in der Nähe; der Gesamtpreis mit Aufschlüsselung nach Saisons und Endreinigung, dazu die Anzahlung |
+| „Und für 4 Personen?“, „Und vom 19. bis 26. August?“ | Folgefragen übernehmen die übrigen Angaben aus der vorigen Frage |
+| „Wann ist im Januar noch frei?“ | Die freien Zeiträume im genannten Zeitraum; ohne Angabe in den nächsten drei Monaten |
+| „Was kostet bei euch eine Nacht?“ | Die Saisonpreise, Endreinigung, Mindestaufenthalt und höchste Gästezahl |
+| Fragen auf Englisch | Antworten auf Englisch |
+| Andere Themen, etwa Ausstattung | Ein Hinweis, dass der Assistent nur zu Terminen und Preisen Auskunft gibt |
+
+Ein Datum ohne Jahr bezieht sich auf das nächste Mal, an dem es kommt; „im November“ während des Novembers meint den laufenden. Zu kurze Aufenthalte, zu viele Gäste und Zeiträume ohne hinterlegte Preise werden mit dem Grund beantwortet, statt einen Preis zu nennen. Alle Antworten mit Verfügbarkeit oder Preis enden mit dem Hinweis, dass die Angaben unverbindlich sind.
+
+### Schutz und Datenschutz
+
+- **Keine Gästedaten**: Der Block nennt nur, was Belegungsplan und Preisliste auf der Website ohnehin zeigen. Titel und andere Inhalte der Kalendertermine werden nicht ausgegeben, nur die Zeiträume.
+- **Nichts wird gespeichert**: Das Gespräch und die zuletzt verstandene Anfrage hält nur die Seite im Browser und schickt beides mit jeder Frage mit.
+- **Begrenzung der Anfragen**: Jeder Besucher kann 20 Fragen in 10 Minuten stellen, danach erhält er einen Hinweis. Dafür speichert das Paket in der Tabelle `OllamaChatRateLimits` einen Hashwert seiner IP-Adresse mit einem geheimen, zufälligen Salz, nie die Adresse selbst; die Einträge werden nach Ablauf der 10 Minuten gelöscht.
+- **Kein CSRF-Token**: Der Endpunkt ändert nichts und gibt nur öffentliche Informationen heraus; ein Token würde auf zwischengespeicherten Seiten veralten.
+
+### Endpunkt
+
+`POST /ccm/ollama_chat/fewo` erwartet JSON mit `bID`, `question`, optional `history` (wie beim Endpunkt des Admin-Chats) und optional `context` (die mit der vorigen Antwort gelieferte Anfrage). Er antwortet mit `{ "answer": "…", "model": "…", "context": { "arrival": "JJJJ-MM-TT", "departure": "JJJJ-MM-TT", "guests": 2 } }` oder mit einem Fehlerstatus und `{ "error": "…" }`:
+
+| Status | Bedeutung |
+| --- | --- |
+| `400` | Frage fehlt oder ist zu lang, oder der Verlauf ist ungültig |
+| `404` | Der Block existiert nicht mehr |
+| `429` | Zu viele Fragen in kurzer Zeit |
+| `502` | Ollama ist nicht erreichbar oder meldet einen Fehler (Einzelheiten im Concrete-Protokoll) |
+| `503` | Kein Belegungsplan und keine Preisliste gefunden |
+
+### Hinweis zum Fewo Toolkit
+
+Der Job „Belegungsplan (Homeaway)“ des Fewo Toolkits aktualisiert nur Blöcke mit `Blocks.bIsActive = 1`. Concrete 9 setzt diese Spalte bei neu angelegten Blöcken nicht mehr; für solche Blöcke aktualisiert der Job den Feed deshalb nicht. Der Block „Ferienwohnung: Verfügbarkeit & Preis“ ist davon nicht abhängig: Er lädt den Feed selbst neu, wenn die zwischengespeicherte Datei älter ist als das Aktualisierungsintervall des Belegungsplans.
+
 ## Aufbau
 
 ```text
 ollama_chat/
-├── controller.php                  Paket: Installation des Blocks, Route /ccm/ollama_chat/ask
-├── blocks/ollama_chat/
-│   ├── controller.php              Block: Einstellungen, Prüfung der Eingaben, Daten für die Ansicht
-│   ├── db.xml                      Tabelle btOllamaChat mit den Block-Einstellungen
-│   ├── add.php, edit.php, form.php Formular für die Einstellungen
-│   ├── view.php                    Chat: Nachrichten, Eingabefeld
-│   ├── view.js                     Senden der Fragen, Gedächtnis im Browser, Markdown-Darstellung
-│   └── view.css                    Aussehen, passt sich hellen und dunklen Themes an
-└── src/                            Namensraum OllamaChat\
-    ├── AccessChecker.php           Wer darf fragen
-    ├── BlockSettings.php           Einstellungen eines Blocks
-    ├── ChatService.php             System-Prompt, Aufteilung des Kontextfensters, Auswahl des Verlaufs
-    ├── InstallationContext.php     Liest die Übersicht aus der Datenbank
-    ├── OllamaClient.php            Aufruf von Ollama (/api/chat)
-    ├── OllamaException.php         Verständliche Fehlermeldungen
-    └── Controller/AskController.php Endpunkt für die Fragen
+├── controller.php                    Paket: Installation der Blöcke, Routen, gemeinsame Assets
+├── db.xml                            Tabelle OllamaChatRateLimits (Begrenzung der öffentlichen Anfragen)
+├── js/ollama-chat.js                 Chat im Browser für beide Blöcke: Senden, Gedächtnis, Markdown
+├── css/ollama-chat.css               Aussehen, passt sich hellen und dunklen Themes an
+├── blocks/ollama_chat/               Block „Ollama Chat“ (Fragen zur Installation)
+│   ├── controller.php                Einstellungen, Prüfung der Eingaben, Daten für die Ansicht
+│   ├── db.xml                        Tabelle btOllamaChat
+│   ├── add.php, edit.php, form.php   Formular für die Einstellungen
+│   └── view.php                      Chat
+├── blocks/ollama_fewo/               Block „Ferienwohnung: Verfügbarkeit & Preis“
+│   ├── controller.php, db.xml        Einstellungen, Tabelle btOllamaFewo
+│   ├── add.php, edit.php, form.php   Formular, zeigt die gefundenen Daten des Fewo Toolkits
+│   └── view.php                      Chat für Gäste
+└── src/                              Namensraum OllamaChat\
+    ├── AccessChecker.php             Wer den Admin-Chat nutzen darf
+    ├── BlockSettings.php             Verbindung zu Ollama (URL, Modell, Kontextfenster)
+    ├── ChatRequest.php               Prüfung von Frage und Verlauf
+    ├── ChatService.php               Admin-Chat: System-Prompt, Aufteilung des Kontextfensters
+    ├── ContextWindow.php             Schätzung der Tokens, Auswahl des Verlaufs
+    ├── InstallationContext.php       Admin-Chat: liest die Übersicht aus der Datenbank
+    ├── OllamaClient.php              Aufruf von Ollama (/api/chat), auch mit JSON-Schema
+    ├── OllamaException.php           Verständliche Fehlermeldungen
+    ├── RateLimiter.php               Begrenzung der öffentlichen Anfragen
+    ├── Controller/AskController.php  Endpunkt des Admin-Chats
+    ├── Controller/FewoAskController.php Endpunkt des Ferienwohnungs-Chats
+    └── Fewo/
+        ├── FewoSources.php           Findet Belegungsplan und Preisliste des Fewo Toolkits
+        ├── OccupancyCalendar.php     Liest den iCal-Feed, prüft Zeiträume, findet freie Zeiträume
+        ├── PriceCalculator.php       Prüft die Eingaben und ruft die Preisberechnung des Fewo Toolkits auf
+        ├── RequestExtractor.php      Lässt das Modell die Frage verstehen (JSON-Schema)
+        ├── StayRequest.php           Die verstandene Anfrage
+        ├── FewoAssistant.php         Setzt die Antwort zusammen
+        ├── FewoTexts.php             Textbausteine auf Deutsch und Englisch
+        ├── FewoBlockSettings.php     Einstellungen des Blocks
+        └── FewoUnavailableException.php
 ```
 
-Der Endpunkt `POST /ccm/ollama_chat/ask` erwartet JSON mit `token`, `bID`, `question` und optional `history` (Liste von `{ "role": "user" | "assistant", "content": "…" }`). Er antwortet mit `{ "answer": "…", "model": "…" }` oder mit einem Fehlerstatus und `{ "error": "…" }`:
+Der Endpunkt des Admin-Chats, `POST /ccm/ollama_chat/ask`, erwartet JSON mit `token`, `bID`, `question` und optional `history` (Liste von `{ "role": "user" | "assistant", "content": "…" }`). Er antwortet mit `{ "answer": "…", "model": "…" }` oder mit einem Fehlerstatus und `{ "error": "…" }`:
 
 | Status | Bedeutung |
 | --- | --- |
@@ -254,8 +354,8 @@ Im Dashboard unter **Erweiterungen** bei „Ollama Chat“ auf **Deinstallieren*
 concrete/bin/concrete c5:package:uninstall ollama_chat
 ```
 
-Die Blöcke verschwinden mit ihren Einstellungen von den Seiten; nach einer erneuten Installation müssen sie neu eingefügt werden. Die dann leere Tabelle `btOllamaChat` lässt Concrete in der Datenbank stehen. Wer sie nicht mehr braucht, kann sie löschen:
+Die Blöcke verschwinden mit ihren Einstellungen von den Seiten; nach einer erneuten Installation müssen sie neu eingefügt werden. Die Tabellen lässt Concrete in der Datenbank stehen. Wer sie nicht mehr braucht, kann sie löschen:
 
 ```sql
-DROP TABLE btOllamaChat;
+DROP TABLE btOllamaChat, btOllamaFewo, OllamaChatRateLimits;
 ```

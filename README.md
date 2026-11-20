@@ -2,7 +2,11 @@
 
 Dieses Repository enthält:
 
-- **[`ollama_chat/`](ollama_chat/)**: ein Paket für Concrete CMS 9.5 mit dem Block „Ollama Chat“. Über ein Eingabefeld stellt man Fragen zur eigenen Concrete-Installation; ein lokales Sprachmodell beantwortet sie anhand der Daten aus der Datenbank. Installation in eine bestehende Concrete-Installation und alle Details: [ollama_chat/README.md](ollama_chat/README.md).
+- **[`ollama_chat/`](ollama_chat/)**: ein Paket für Concrete CMS 9.5 mit zwei Blöcken, die Fragen mit Hilfe eines lokalen Sprachmodells beantworten:
+  - **Ollama Chat**: Fragen zur eigenen Concrete-Installation, anhand der Daten aus der Datenbank; nur für Benutzer mit Dashboard-Zugang.
+  - **Ferienwohnung: Verfügbarkeit & Preis**: öffentliche Fragen von Gästen zu freien Terminen und Preisen, anhand von Belegungsplan und Preisliste des Pakets Fewo Toolkit.
+
+  Installation in eine bestehende Concrete-Installation und alle Details: [ollama_chat/README.md](ollama_chat/README.md).
 - **`docker-compose.yml`**: ein Beispiel, wie Concrete, die Datenbank und Ollama gemeinsam in Docker-Containern laufen, mit dem Paket bereits eingerichtet. Darum geht es in dieser Datei.
 
 ## Inhalt
@@ -82,6 +86,14 @@ Danach:
 Die erste Antwort dauert ohne Grafikkarte eine Minute oder länger, weil Ollama das Modell erst in den Arbeitsspeicher lädt. Danach geht es schneller.
 
 Die Seite „KI-Assistent“ erscheint nicht im Menü und der Chat nur für angemeldete Benutzer mit Dashboard-Zugang.
+
+Der Block „Ferienwohnung: Verfügbarkeit & Preis“ braucht das Paket Fewo Toolkit, das nicht Teil dieses Repositorys ist. Liegt es als Ordner `fewo_toolkit` neben `ollama_chat`, lässt es sich wie `ollama_chat` als Volume nach `/srv/app/public/packages/fewo_toolkit` einbinden und dann installieren:
+
+```bash
+docker compose exec -u www-data concrete concrete/bin/concrete c5:package:install fewo_toolkit
+```
+
+Der Ordner `fewo_toolkit` steht in `.gitignore` und wird nicht eingecheckt.
 
 ## Was beim ersten Start passiert
 

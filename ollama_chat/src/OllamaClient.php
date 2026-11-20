@@ -24,27 +24,31 @@ final class OllamaClient
 
     /**
      * @param array<int, array{role: string, content: string}> $messages system prompt, history and question
+     * @param array<string, mixed>|null $format JSON schema the answer must follow (structured output), or null for free text
+     * @param array<string, mixed> $options additional model options, e.g. ['temperature' => 0]
      *
      * @throws OllamaException if Ollama could not answer
      *
      * @return array{content: string, promptTokens: int|null, answerTokens: int|null}
      */
-    public function chat(array $messages): array
+    public function chat(array $messages, ?array $format = null, array $options = []): array
     {
         $client = new Client([
             'base_uri' => rtrim($this->settings->ollamaUrl, '/') . '/',
             'timeout' => self::TIMEOUT_SECONDS,
             'connect_timeout' => 5,
         ]);
+        $body = [
+            'model' => $this->settings->model,
+            'messages' => $messages,
+            'stream' => false,
+            'options' => array_merge(['num_ctx' => $this->settings->contextSize], $options),
+        ];
+        if ($format !== null) {
+            $body['format'] = $format;
+        }
         try {
-            $response = $client->post('api/chat', [
-                'json' => [
-                    'model' => $this->settings->model,
-                    'messages' => $messages,
-                    'stream' => false,
-                    'options' => ['num_ctx' => $this->settings->contextSize],
-                ],
-            ]);
+            $response = $client->post('api/chat', ['json' => $body]);
         } catch (ConnectException $e) {
             throw new OllamaException(t('Der Ollama-Server unter %s ist nicht erreichbar. Läuft er (ollama serve)?', $this->settings->ollamaUrl), 0, $e);
         } catch (RequestException $e) {
