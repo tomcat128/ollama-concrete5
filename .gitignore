@@ -1,0 +1,8 @@
+# Local configuration with passwords; the template is .env.example
+.env
+
+# IDEs and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store

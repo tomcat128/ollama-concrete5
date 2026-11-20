@@ -1,0 +1,123 @@
+# Concrete CMS + MariaDB + Ollama, mit dem Paket "Ollama Chat".
+#
+# Start:  cp .env.example .env   (Passwörter eintragen)
+#         docker compose up -d
+#
+# Ablauf beim ersten Start:
+#   db, ollama       starten
+#   ollama-pull      lädt das Modell in den Ollama-Container (einmalig, mehrere GB)
+#   concrete-setup   installiert Concrete, das Paket und eine Beispielseite (einmalig)
+#   concrete         Webserver, startet nach concrete-setup
+#
+# Details: README.md
+
+name: concrete-ollama
+
+services:
+  db:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_DATABASE:-concrete}
+      MARIADB_USER: ${DB_USER:-concrete}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD in .env setzen}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD in .env setzen}
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  ollama:
+    image: ollama/ollama:${OLLAMA_VERSION:-0.40.16}
+    restart: unless-stopped
+    environment:
+      # How long a model stays in memory after the last question; loading it again takes a while.
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+    volumes:
+      - ollama-data:/root/.ollama
+    # No published port: only Concrete reaches Ollama, through the internal network (http://ollama:11434).
+    # Ollama has no access control, so it should not be reachable from outside.
+    # To reach it from the host for testing, uncomment (11435, so it does not clash with a local Ollama):
+    # ports:
+    #   - "127.0.0.1:11435:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    # NVIDIA graphics card (requires the NVIDIA Container Toolkit on the host), makes answers much faster:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # Downloads the model into the ollama-data volume. Runs on every "up"; if the model is already there,
+  # it only checks for updates and finishes after a few seconds.
+  ollama-pull:
+    image: ollama/ollama:${OLLAMA_VERSION:-0.40.16}
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ["pull", "${OLLAMA_MODEL:-llama3:latest}"]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  # Installs Concrete on the first start, then the Ollama Chat package and an example page with the chat block.
+  # On later starts it only checks that everything is there.
+  concrete-setup:
+    image: ${C5_IMAGE:-fehrenbacher/concrete5:9.5.4_php8.4.25}
+    user: www-data
+    entrypoint: ["sh", "/setup/concrete-setup.sh"]
+    environment:
+      DB_DATABASE: ${DB_DATABASE:-concrete}
+      DB_USER: ${DB_USER:-concrete}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD in .env setzen}
+      C5_SITE_NAME: ${C5_SITE_NAME:-Concrete mit Ollama}
+      C5_CANONICAL_URL: ${C5_CANONICAL_URL:-http://localhost:8080/}
+      C5_STARTING_POINT: ${C5_STARTING_POINT:-atomik_full}
+      C5_ADMIN_EMAIL: ${C5_ADMIN_EMAIL:-admin@example.com}
+      C5_ADMIN_PASSWORD: ${C5_ADMIN_PASSWORD:?C5_ADMIN_PASSWORD in .env setzen}
+      OLLAMA_CHAT_URL: http://ollama:11434
+      OLLAMA_CHAT_MODEL: ${OLLAMA_MODEL:-llama3:latest}
+    volumes:
+      - concrete-application:/srv/app/public/application
+      - ./ollama_chat:/srv/app/public/packages/ollama_chat:ro
+      - ./docker:/setup:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  concrete:
+    image: ${C5_IMAGE:-fehrenbacher/concrete5:9.5.4_php8.4.25}
+    restart: unless-stopped
+    ports:
+      # Only reachable from this computer. For access from the network, set C5_BIND=0.0.0.0 in .env.
+      - "${C5_BIND:-127.0.0.1}:${C5_PORT:-8080}:80"
+    environment:
+      # Suggested for new chat blocks; see the package's README.
+      OLLAMA_CHAT_URL: http://ollama:11434
+      OLLAMA_CHAT_MODEL: ${OLLAMA_MODEL:-llama3:latest}
+    volumes:
+      # Configuration and uploaded files of the installation; the Concrete core comes from the image.
+      - concrete-application:/srv/app/public/application
+      - ./ollama_chat:/srv/app/public/packages/ollama_chat:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      concrete-setup:
+        condition: service_completed_successfully
+
+volumes:
+  db-data:
+  ollama-data:
+  concrete-application:
